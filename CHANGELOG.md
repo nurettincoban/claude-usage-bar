@@ -6,6 +6,21 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-10-12
+
+### Added
+
+- **What's using your limit**: each project's share of the current session window,
+  weighted by API cost, from Claude Code usage on this Mac.
+- **API cost estimate** for the session window, today and the last 14 days. It uses
+  published list prices and covers cache-write TTLs, fast mode and Haiku long-context rates.
+- **Anthropic status** from status.claude.com. There's a banner and menu bar badge when claude.ai,
+  the API or Claude Code is affected, and a footer note for other incidents. You can turn it off in settings.
+
+### Changed
+
+- The session-window breakdown replaces today's top projects list.
+
 ## [1.0.0] - 2026-10-12
 
 ### Added

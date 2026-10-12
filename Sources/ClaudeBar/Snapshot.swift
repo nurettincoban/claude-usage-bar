@@ -3,10 +3,11 @@ import SwiftUI
 
 /// Renders the popover to a PNG and exits, without touching the menu bar:
 ///
-///     ClaudeBar --snapshot out.png [--dark] [--demo]
+///     ClaudeBar --snapshot out.png [--dark] [--demo [--incident]]
 ///
 /// `--demo` swaps in made-up data and frames the popover under a menu bar item,
 /// which is how the README screenshots are produced (`make screenshots`).
+/// `--incident` adds a sample status-page incident to the demo.
 enum Snapshot {
     static var outputPath: String? {
         let args = CommandLine.arguments
@@ -19,14 +20,16 @@ enum Snapshot {
     @MainActor
     static func run(to path: String) {
         let args = CommandLine.arguments
-        let dark = args.contains("--dark"), demo = args.contains("--demo")
+        let dark = args.contains("--dark"), demo = args.contains("--demo"), incident = args.contains("--incident")
         Task { @MainActor in
             let store = UsageStore.shared
             if demo {
-                store.show(usage: DemoData.usage, local: DemoData.local, plan: "Max 20x", orgName: nil)
+                store.show(usage: DemoData.usage, local: DemoData.local,
+                           status: incident ? DemoData.incident : DemoData.operational, plan: "Max 20x", orgName: nil)
             } else {
                 await store.refreshUsage(force: true)
                 await store.refreshLocal()
+                await store.refreshStatus()
             }
             let popover = PopoverView()
                 .environment(store)
@@ -57,7 +60,8 @@ private struct Hero<Popover: View>: View {
             HStack(spacing: 14) {
                 Image(systemName: "wifi")
                 Image(systemName: "battery.75percent")
-                Image(nsImage: StatusImage.render(outer: 0.42, inner: nil, text: "42%", alert: false))
+                Image(nsImage: StatusImage.render(outer: 0.42, inner: nil, text: "42%", alert: false,
+                                                  badge: UsageStore.shared.status?.affectsClaudeCode ?? false))
                     .renderingMode(.template)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -107,26 +111,43 @@ private enum DemoData {
     static var local: LocalSnapshot {
         let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
+        let now = Date()
         let millions = [18, 32, 0, 41, 27, 55, 12, 0, 0, 36, 61, 44, 29, 48.6]
         var snapshot = LocalSnapshot()
         snapshot.todayTokens = 48_600_000
         snapshot.todayOutput = 412_000
         snapshot.todayMessages = 386
         snapshot.todaySessions = 7
+        snapshot.todayCost = 38.4
         snapshot.activeSessions = 2
         snapshot.daily = millions.enumerated().map { i, m in
             DayBucket(date: calendar.date(byAdding: .day, value: i - (millions.count - 1), to: today)!,
-                      tokens: Int(m * 1_000_000))
+                      tokens: Int(m * 1_000_000), cost: m * 0.79)
         }
         snapshot.models = [
             NamedCount(name: "Opus 5.5", value: 78), NamedCount(name: "Sonnet 5.5", value: 15),
             NamedCount(name: "Haiku 5.5", value: 7),
         ]
-        snapshot.topProjects = [
-            NamedCount(name: "menubar-app", value: 21_400_000),
-            NamedCount(name: "api-gateway", value: 15_900_000),
-            NamedCount(name: "dotfiles", value: 4_200_000),
+        var window = SessionWindow(start: now.addingTimeInterval(-(2 * 3600 + 55 * 60)), isApproximate: false)
+        window.tokens = 14_800_000
+        window.cost = 10.55
+        window.replies = 142
+        window.projects = [
+            WindowShare(name: "menubar-app", tokens: 8_100_000, cost: 6.12, share: 0.58),
+            WindowShare(name: "api-gateway", tokens: 5_200_000, cost: 3.27, share: 0.31),
+            WindowShare(name: "dotfiles", tokens: 1_500_000, cost: 1.16, share: 0.11),
         ]
+        snapshot.window = window
         return snapshot
     }
+
+    static let operational = ServiceStatus(indicator: "none", summary: "All Systems Operational", incidents: [], degraded: [])
+
+    static let incident = ServiceStatus(
+        indicator: "major",
+        summary: "Partial System Outage",
+        incidents: [ServiceStatus.Incident(id: "demo", name: "Elevated error rates on Claude Code", impact: "major",
+                                           status: "identified", url: nil, components: ["Claude Code"])],
+        degraded: ["Claude Code"]
+    )
 }

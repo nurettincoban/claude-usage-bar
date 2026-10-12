@@ -16,8 +16,10 @@ make install   # build the .app, copy it to ~/Applications and launch it
 
 ## Before opening a pull request
 
-- `make test` passes. Add a test when you change parsing, the transcript
-  scanner or the pace maths. They're all pure and easy to test.
+- `make test` passes. Add a test when you change parsing, pricing, the
+  transcript scanner or the pace maths. They're all pure and easy to test.
+- Price changes cite the [pricing page](https://platform.claude.com/docs/en/about-claude/pricing)
+  and update the date in `Pricing.swift`.
 - UI changes come with fresh screenshots: `make screenshots` renders the
   popover from demo data, so no personal data ends up in the repository.
 - Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/),
@@ -31,6 +33,8 @@ make install   # build the .app, copy it to ~/Applications and launch it
 | --- | --- |
 | `UsageAPI.swift` | Reads Claude Code's login, calls the usage endpoint, parses the response |
 | `LocalStats.swift` | Tails `~/.claude/projects/**/*.jsonl` incrementally and aggregates activity |
+| `Pricing.swift` | Model names and API list prices for the cost estimate |
+| `ServiceStatus.swift` | Fetches and interprets status.claude.com |
 | `UsageStore.swift` | Observable app state, polling, notifications |
 | `PopoverView.swift` | The popover UI |
 | `ClaudeBarApp.swift` | App entry point and the menu bar icon |

@@ -42,7 +42,8 @@ struct MenuBarLabel: View {
             outer: session.map { $0 / 100 },
             inner: mode == .both ? weekly.map { $0 / 100 } : nil,
             text: text,
-            alert: worst >= 90
+            alert: worst >= 90,
+            badge: store.status?.affectsClaudeCode ?? false
         ))
     }
 }
@@ -50,7 +51,8 @@ struct MenuBarLabel: View {
 /// Draws the menu bar item (ring gauge + percentage) as a single template image, so it
 /// renders crisply and follows the menu bar's light/dark appearance.
 enum StatusImage {
-    static func render(outer: Double?, inner: Double?, text: String?, alert: Bool) -> NSImage {
+    /// - Parameter badge: adds a dot to the gauge, used when Anthropic reports an incident.
+    static func render(outer: Double?, inner: Double?, text: String?, alert: Bool, badge: Bool = false) -> NSImage {
         let color: NSColor = alert ? .systemRed : .black
         let attributes: [NSAttributedString.Key: Any] = [
             .font: NSFont.monospacedDigitSystemFont(ofSize: 12, weight: .medium),
@@ -86,6 +88,15 @@ enum StatusImage {
                 gauge(radius: 2.9, width: 1.8, fraction: inner)
             } else {
                 gauge(radius: 6, width: 2.4, fraction: outer)
+            }
+            if badge {
+                // Punch a gap around the dot so it reads as a badge, not part of the ring.
+                let dot = NSRect(x: ring - 5.5, y: height - 6.5, width: 5.5, height: 5.5)
+                NSGraphicsContext.current?.compositingOperation = .clear
+                NSBezierPath(ovalIn: dot.insetBy(dx: -1.5, dy: -1.5)).fill()
+                NSGraphicsContext.current?.compositingOperation = .sourceOver
+                color.setFill()
+                NSBezierPath(ovalIn: dot).fill()
             }
             if let text {
                 (text as NSString).draw(

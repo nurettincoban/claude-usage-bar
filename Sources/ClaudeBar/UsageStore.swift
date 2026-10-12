@@ -17,6 +17,7 @@ enum MenuBarMode: String, CaseIterable, Identifiable {
 enum Prefs {
     static let menuBarMode = "menuBarMode"
     static let notifications = "notifications"
+    static let serviceStatus = "serviceStatus"
     static let sentAlerts = "sentAlerts"
 }
 
@@ -31,6 +32,7 @@ final class UsageStore {
     private(set) var plan: String?
     private(set) var error: UsageError?
     private(set) var isLoading = false
+    private(set) var status: ServiceStatus?
 
     @ObservationIgnored private let scanner = TranscriptScanner()
     @ObservationIgnored private var started = false
@@ -38,6 +40,7 @@ final class UsageStore {
 
     private static let apiInterval: Duration = .seconds(180)
     private static let localInterval: Duration = .seconds(60)
+    private static let statusInterval: Duration = .seconds(300)
 
     var sessionLimit: UsageLimit? { usage?.limits.first { $0.group == "session" } }
     var weeklyLimit: UsageLimit? {
@@ -59,6 +62,12 @@ final class UsageStore {
                 try? await Task.sleep(for: Self.localInterval)
             }
         }
+        Task {
+            while !Task.isCancelled {
+                await refreshStatus()
+                try? await Task.sleep(for: Self.statusInterval)
+            }
+        }
         if notificationsEnabled, Bundle.main.bundleIdentifier != nil {
             UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         }
@@ -77,6 +86,7 @@ final class UsageStore {
         Task {
             await refreshUsage(force: true)
             await refreshLocal()
+            await refreshStatus()
         }
     }
 
@@ -94,6 +104,8 @@ final class UsageStore {
             if profile == nil {
                 profile = try? await UsageAPI.fetchProfile(token: creds.accessToken)
             }
+            // The first local scan may have run before the session window was known.
+            if local?.window?.isApproximate ?? false { await refreshLocal() }
         } catch let failure as UsageError {
             error = failure
             if case .rateLimited(let retryAfter) = failure {
@@ -105,12 +117,23 @@ final class UsageStore {
     }
 
     func refreshLocal() async {
-        local = await scanner.scan()
+        let windowStart = sessionLimit?.resetsAt.map { $0.addingTimeInterval(-(sessionLimit?.windowLength ?? 0)) }
+        local = await scanner.scan(windowStart: windowStart)
+    }
+
+    func refreshStatus() async {
+        guard UserDefaults.standard.object(forKey: Prefs.serviceStatus) as? Bool ?? true else {
+            status = nil
+            return
+        }
+        // Keep the last known status on failure; the status page being down isn't news on its own.
+        if let fresh = try? await ServiceStatus.fetch() { status = fresh }
     }
 
     /// Replaces live data with fixed values; used for screenshots.
-    func show(usage: UsageSnapshot, local: LocalSnapshot, plan: String?, orgName: String?) {
+    func show(usage: UsageSnapshot, local: LocalSnapshot, status: ServiceStatus?, plan: String?, orgName: String?) {
         self.usage = usage
+        self.status = status
         self.local = local
         self.plan = plan
         self.profile = Profile(orgName: orgName, displayName: nil)

@@ -44,7 +44,7 @@ struct TranscriptScannerTests {
         #expect(snapshot.todayTokens == 115 + 117)
         #expect(snapshot.todaySessions == 2)
         #expect(snapshot.activeSessions == 2)
-        #expect(snapshot.topProjects.first?.name == "demo")
+        #expect(snapshot.window?.projects.first?.name == "demo")
         #expect(snapshot.models.map(\.name) == ["Opus 5.5"])
         #expect(snapshot.daily.count == TranscriptScanner.horizonDays)
         #expect(snapshot.daily.last?.tokens == 232)
@@ -79,6 +79,43 @@ struct TranscriptScannerTests {
         ("claude-opus-5", "Opus 5"),
     ])
     func prettifiesModelIDs(id: String, expected: String) {
-        #expect(TranscriptScanner.modelName(id) == expected)
+        #expect(ModelCatalog.displayName(id) == expected)
+    }
+
+    @Test func attributesSessionWindowByCost() async throws {
+        let now = Date()
+        let windowStart = now.addingTimeInterval(-3600)
+        try append([
+            line(id: "before", output: 1_000, date: now.addingTimeInterval(-2 * 3600)),           // outside the window
+            line(id: "a", model: "claude-opus-5-5", input: 0, output: 1_000, cacheRead: 0),        // $0.02
+            line(id: "b", model: "claude-haiku-5-5", input: 0, output: 1_000, cacheRead: 90_000, session: "s2"), // $0.0014
+        ].joined(separator: "\n") + "\n")
+        // Second project for "b".
+        let other = try String(contentsOf: file, encoding: .utf8)
+            .replacingOccurrences(of: #""cwd":"/Users/me/code/demo","requestId":"req_b""#,
+                                  with: #""cwd":"/Users/me/code/other","requestId":"req_b""#)
+        try other.write(to: file, atomically: true, encoding: .utf8)
+
+        let snapshot = await TranscriptScanner(roots: [root]).scan(now: now, windowStart: windowStart)
+        let window = try #require(snapshot.window)
+        #expect(!window.isApproximate)
+        #expect(window.replies == 2)
+        #expect(abs(window.cost - 0.0214) < 1e-9)
+        // "other" used 91× the tokens, mostly cheap cache reads; cost decides the split.
+        #expect(window.projects.map(\.name) == ["demo", "other"])
+        #expect(abs(window.projects[0].share - 0.02 / 0.0214) < 1e-9)
+    }
+
+    @Test func fallsBackToTokenSharesForUnpricedModels() async throws {
+        try append([
+            line(id: "a", model: "claude-future-9", input: 0, output: 300, cacheRead: 0),
+            line(id: "b", model: "claude-opus-5-5", input: 0, output: 100, cacheRead: 0),
+        ].joined(separator: "\n") + "\n")
+        let snapshot = await TranscriptScanner(roots: [root]).scan()
+        let window = try #require(snapshot.window)
+        #expect(window.isApproximate)
+        #expect(window.projects.first?.share == 1) // both in "demo"
+        #expect(snapshot.todayCostIsPartial)
+        #expect(abs(snapshot.todayCost - 0.002) < 1e-9)
     }
 }
