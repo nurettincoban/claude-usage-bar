@@ -17,7 +17,7 @@ at API prices, and flags Anthropic incidents.
 
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
-  <img src="docs/screenshot-light.png" width="412" alt="ClaudeBar popover showing session and weekly limits, extra usage, and today's Claude Code activity">
+  <img src="docs/screenshot-light.png" width="412" alt="ClaudeBar popover showing session and weekly limits with pace predictions, extra usage, each project's share of the session window with API cost, and today's Claude Code activity">
 </picture>
 
 </div>
