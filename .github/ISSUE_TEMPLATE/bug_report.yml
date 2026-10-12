@@ -1,0 +1,33 @@
+name: Bug report
+description: Something isn't working
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you saw, and what you expected instead. Screenshots help, but crop out anything personal.
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version
+      placeholder: "15.5"
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: ClaudeBar version
+      placeholder: "1.0.0, or a commit hash if built from source"
+  - type: dropdown
+    id: plan
+    attributes:
+      label: Claude plan
+      options: [Pro, Max 5x, Max 20x, Team, Enterprise, API key only, Other]
+  - type: textarea
+    id: error
+    attributes:
+      label: Error banner text
+      description: If the popover shows an error, paste it here. Never paste tokens or keychain contents.
